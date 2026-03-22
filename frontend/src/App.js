@@ -16,7 +16,7 @@ export default function App() {
   const [isReady, setIsReady] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const BACKEND_URL = window.location.hostname === 'localhost' ? 'http://localhost:5001' : 'https://你的-render-網址.onrender.com';
+  const BACKEND_URL = window.location.hostname === 'localhost' ? 'http://localhost:5001' : 'https://arxiv-paper-fetcher.onrender.com';
 
   const handleInit = async () => {
     if (provider.id === 'anthropic') return alert("Anthropic 不支援 Embedding，請先選擇 OpenAI 或 Google 進行初始化！");
