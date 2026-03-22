@@ -17,7 +17,7 @@ app.post('/api/arxiv/init', async (req, res) => {
   console.log(`\n⚡ 啟動 arXiv 論文內化: ${searchQuery} (使用 ${providerId})`);
 
   try {
-    const papers = await arxivScraper(searchQuery, 10);
+    const papers = await arxivScraper(searchQuery, 20);
     const db = [];
     
     for (let i = 0; i < papers.length; i++) {
@@ -44,7 +44,7 @@ app.post('/api/chat', async (req, res) => {
     const db = vectorDatabase[searchQuery].chunks;
     const scoredChunks = db.map(item => ({ text: item.text, metadata: item.metadata, score: cosineSimilarity(queryVector, item.embedding) })).sort((a, b) => b.score - a.score);
 
-    const topContext = scoredChunks.slice(0, 5).map(c => `[論文: ${c.metadata.title}]\n摘要: ${c.text}`).join('\n\n');
+    const topContext = scoredChunks.slice(0, 10).map(c => `[論文: ${c.metadata.title}]\n摘要: ${c.text}`).join('\n\n');
     const answer = await generateAnswer(query, topContext, apiKey, providerId, chatModel);
     
     res.json({ answer });
