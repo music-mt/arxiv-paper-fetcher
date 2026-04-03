@@ -3,3 +3,5 @@ node_modules/
 build/
 dist/
 .DS_Store
+# 內部操作文件
+CLAUDE.md
