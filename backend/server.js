@@ -84,7 +84,10 @@ app.post('/api/chat', async (req, res) => {
     // 相似度只是排序，不代表摘要足以支持答案；由回答規則再檢查證據。
     const topChunks = scoredChunks.slice(0, 8);
     const answer = await generateAnswer(query, buildEvidenceContext(topChunks), apiKey, providerId, chatModel);
-    res.json({ answer, sources: citedSources(answer, topChunks) });
+    const sources = citedSources(answer, topChunks);
+    // 模型偶爾會在「無直接證據」的文字後仍附上編號；避免顯示無效引用。
+    const safeAnswer = sources.length === 0 ? answer.replace(/\s*\[\d+\]/g, '') : answer;
+    res.json({ answer: safeAnswer, sources });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

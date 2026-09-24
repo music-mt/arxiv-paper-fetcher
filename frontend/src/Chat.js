@@ -58,7 +58,7 @@ export default function Chat({ apiKey, searchQuery, providerConfig, backendUrl, 
         // 加入系統訊息讓使用者知道更新成功
         setMessages(prev => [...prev, { 
           role: 'assistant', 
-          content: `📥 **系統更新**：已成功追加抓取 10 篇新論文！\n目前本地知識庫已擴張至 **${updatedPapers.length}** 篇。` 
+          content: `📥 已追加 ${data.addedPapers.length} 篇同主題論文。目前文獻庫共有 ${updatedPapers.length} 篇；如要找特定問題的論文，請使用「更換主題」輸入更精確的關鍵字。`
         }]);
       }
     } catch (err) {
@@ -122,7 +122,7 @@ export default function Chat({ apiKey, searchQuery, providerConfig, backendUrl, 
             className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:bg-slate-300 transition-all text-sm font-bold shadow-lg shadow-green-100"
           >
             {isLoadingMore ? <Loader2 className="animate-spin" size={18} /> : <PlusCircle size={18} />}
-            繼續搜尋 10 篇
+            同主題再搜尋 10 篇
           </button>
           
           <button 
