@@ -3,8 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const { randomUUID } = require('crypto');
 const { arxivScraper } = require('./scraper');
-const { getConcept } = require('./concepts');
-const { getEmbedding, cosineSimilarity, generateAnswer, isConceptQuestion, explainConcept, translateSearchQuery, embedPapers, buildEvidenceContext, citedSources } = require('./rag');
+const { getEmbedding, cosineSimilarity, generateAnswer, translateSearchQuery, embedPapers, buildEvidenceContext } = require('./rag');
+const { finalizeAnswer } = require('./answer-contract');
 
 const app = express();
 app.use(cors());
@@ -23,7 +23,7 @@ const addUniquePapers = (database, papers) => {
   return papers.filter(paper => !existingIds.has(paper.id));
 };
 
-app.get('/health', (req, res) => res.set('X-App-Version', 'concept-accuracy-2026-09-25').status(200).send('OK'));
+app.get('/health', (req, res) => res.set('X-App-Version', 'grounded-contract-2026-09-25').status(200).send('OK'));
 
 // 初始化接口
 app.post('/api/arxiv/init', async (req, res) => {
@@ -96,22 +96,6 @@ app.post('/api/chat', async (req, res) => {
   const { sessionId, apiKey, providerId, chatModel, embedModel } = req.body;
   const query = cleanText(req.body.query, MAX_CHAT_LENGTH);
   if (!requireFields(req.body, ['sessionId', 'apiKey', 'query', 'providerId', 'chatModel', 'embedModel'])) return fail(res, '缺少必要的對話欄位');
-  if (isConceptQuestion(query)) {
-    const concept = getConcept(query);
-    if (concept) {
-      return res.json({
-        answer: concept.answer,
-        sources: concept.sources.map((source, index) => ({ number: index + 1, ...source })),
-        sourceLabel: '參考資料'
-      });
-    }
-    try {
-      const answer = await explainConcept(query, apiKey, providerId, chatModel);
-      return res.json({ answer, sources: [] });
-    } catch (error) {
-      return res.status(500).json({ error: error.message });
-    }
-  }
   const database = vectorDatabases.get(sessionId);
   if (!database) return fail(res, '工作階段已過期', 410);
   try {
@@ -126,11 +110,9 @@ app.post('/api/chat', async (req, res) => {
 
     // 相似度只是排序，不代表摘要足以支持答案；由回答規則再檢查證據。
     const topChunks = scoredChunks.slice(0, 8);
-    const answer = await generateAnswer(query, buildEvidenceContext(topChunks), apiKey, providerId, chatModel);
-    const sources = citedSources(answer, topChunks);
-    // 模型偶爾會在「無直接證據」的文字後仍附上編號；避免顯示無效引用。
-    const safeAnswer = sources.length === 0 ? answer.replace(/\s*\[\d+\]/g, '') : answer;
-    res.json({ answer: safeAnswer, sources });
+    const rawAnswer = await generateAnswer(query, buildEvidenceContext(topChunks), apiKey, providerId, chatModel);
+    const paperOnly = /(?:只(?:根據|用|依據)|僅(?:根據|用|依據)).{0,12}(?:論文|摘要|文獻)|(?:根據|依照).{0,12}(?:這批|這些|目前).{0,8}(?:論文|摘要)|這篇論文/.test(query);
+    res.json(finalizeAnswer(rawAnswer, topChunks, !paperOnly));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

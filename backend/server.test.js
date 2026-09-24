@@ -4,18 +4,9 @@ const rag = require('./rag');
 
 rag.embedPapers = async papers => papers.map(paper => ({ text: paper.content, embedding: [1, 0], metadata: paper }));
 rag.getEmbedding = async () => [1, 0];
-rag.generateAnswer = async () => '一般說明（非這批論文的結論）：張量網路以張量收縮表示系統。';
-rag.explainConcept = async () => '張量網路以張量收縮表示系統。';
+rag.generateAnswer = async () => JSON.stringify({ mode: 'general', answer: '這是一般概念的簡短說明。' });
 
 const app = require('./server');
-
-test('short concept terms are explanations, not paper-evidence requests', () => {
-  for (const query of ['量子加密', '量子糾纏', '說明張量', '張量網路']) {
-    assert.equal(rag.isConceptQuestion(query), true);
-  }
-  assert.equal(rag.isConceptQuestion('只根據這篇論文'), false);
-  assert.equal(rag.isConceptQuestion('introduction to tensors'), false);
-});
 
 test('expired session can be restored from the same papers and queried again', async () => {
   const server = app.listen(0);
@@ -35,19 +26,6 @@ test('expired session can be restored from the same papers and queried again', a
     });
     assert.equal(expired.status, 410);
 
-    const concept = await post('/api/chat', {
-      ...credentials, chatModel: 'test-model', sessionId: 'expired', query: '張量網路'
-    });
-    assert.equal(concept.status, 200);
-    assert.match(concept.data.answer, /不是任何 50 量子位元系統/);
-    assert.equal(concept.data.sourceLabel, '參考資料');
-    assert.equal(concept.data.sources.length, 1);
-
-    const encryption = await post('/api/chat', {
-      ...credentials, chatModel: 'test-model', sessionId: 'expired', query: '量子加密'
-    });
-    assert.match(encryption.data.answer, /不能保證實際設備絕對安全/);
-
     const papers = [{ id: '1234.5678', title: 'Tensor network example', content: 'A tensor network summary.', pdf_url: 'https://arxiv.org/pdf/1234.5678.pdf' }];
     const restored = await post('/api/arxiv/restore', {
       ...credentials, searchQuery: '量子計算', arxivQuery: 'quantum computing', searchMode: 'phrase', papers
@@ -56,11 +34,16 @@ test('expired session can be restored from the same papers and queried again', a
     assert.ok(restored.data.sessionId);
 
     const answer = await post('/api/chat', {
-      ...credentials, chatModel: 'test-model', sessionId: restored.data.sessionId, query: '這篇論文的結果是什麼'
+      ...credentials, chatModel: 'test-model', sessionId: restored.data.sessionId, query: '張量網路'
     });
     assert.equal(answer.status, 200);
-    assert.match(answer.data.answer, /張量網路/);
+    assert.equal(answer.data.grounding, 'general');
     assert.deepEqual(answer.data.sources, []);
+
+    const paperOnly = await post('/api/chat', {
+      ...credentials, chatModel: 'test-model', sessionId: restored.data.sessionId, query: '只根據這批論文說明張量網路'
+    });
+    assert.equal(paperOnly.data.grounding, 'insufficient');
 
     const invalid = await post('/api/arxiv/restore', {
       ...credentials, searchQuery: '量子計算', arxivQuery: 'quantum computing', papers: [{ title: 'missing abstract' }]
