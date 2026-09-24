@@ -31,8 +31,8 @@ export default function App() {
       return alert("⚠️ Anthropic 目前不支援原生 Embedding API，請先選擇 Google 或 OpenAI 進行向量化測試！");
     }
     
-    if (!apiKey) return alert("請輸入您的 API Key！");
-    if (!searchQuery) return alert("請輸入搜尋關鍵字！");
+    if (!apiKey.trim()) return alert("請輸入您的 API Key！");
+    if (!searchQuery.trim()) return alert("請輸入搜尋關鍵字！");
 
     setLoading(true);
     setInitStatus('正在抓取 arXiv 論文並建立索引，通常需要 20–60 秒…');
@@ -42,7 +42,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           searchQuery, 
-          apiKey, 
+          apiKey: apiKey.trim(),
           providerId: provider.id, 
           embedModel: provider.embedModel,
           chatModel: provider.chatModel

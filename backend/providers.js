@@ -7,6 +7,9 @@ const request = async (...args) => {
     return await client.post(...args);
   } catch (error) {
     const detail = error.response?.data?.error?.message || error.response?.data?.error?.type || error.message;
+    if (/API key not valid|API_KEY_INVALID/i.test(detail)) {
+      throw new Error('Google Gemini API 金鑰無效。請到 Google AI Studio 檢查或建立可用的 Gemini API 金鑰，然後重新貼上。請勿將金鑰傳給他人。');
+    }
     throw new Error(`AI provider request failed: ${detail}`);
   }
 };
@@ -36,16 +39,16 @@ const requireText = (text, provider) => {
 const AI_PROVIDERS = {
   google: {
     getEmbedding: async (text, apiKey, modelName) => {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:embedContent?key=${apiKey}`;
-      const res = await request(url, { model: `models/${modelName}`, content: { parts: [{ text }] }, outputDimensionality: 768 }, { headers: { 'Content-Type': 'application/json' }});
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:embedContent`;
+      const res = await request(url, { model: `models/${modelName}`, content: { parts: [{ text }] }, outputDimensionality: 768 }, { headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey.trim() }});
       return res.data.embedding.values;
     },
     generateAnswer: async (prompt, apiKey, modelName) => {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
       const res = await retryTransientRequest(() => request(
         url,
         { contents: [{ parts: [{ text: prompt }] }] },
-        { headers: { 'Content-Type': 'application/json' }}
+        { headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey.trim() }}
       ));
       const text = res.data.candidates?.[0]?.content?.parts
         ?.map(part => part.text || '')
