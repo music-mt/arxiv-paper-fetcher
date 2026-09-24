@@ -8,9 +8,12 @@ const arxivScraper = async (query = 'machine learning', maxResults = 10, start =
     console.log(`🔍 正在搜尋 arXiv: ${query} (從第 ${start} 篇開始，抓取 ${maxResults} 篇)`);
     
     // 增加 start 參數，確保分頁功能正常
-    const arxivUrl = `http://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&sortBy=submittedDate&sortOrder=descending&start=${start}&max_results=${maxResults}`;
+    const arxivUrl = `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&sortBy=submittedDate&sortOrder=descending&start=${start}&max_results=${maxResults}`;
     
-    const response = await axios.get(arxivUrl);
+    const response = await axios.get(arxivUrl, {
+      timeout: 15_000,
+      headers: { 'User-Agent': 'arxiv-paper-fetcher/1.1 (academic RAG client)' }
+    });
     const jsonObj = parser.parse(response.data);
     let entries = jsonObj.feed.entry || [];
     
@@ -25,7 +28,7 @@ const arxivScraper = async (query = 'machine learning', maxResults = 10, start =
         title: entry.title.replace(/\n/g, ' ').trim(),
         content: entry.summary.replace(/\n/g, ' ').trim(),
         authors: Array.isArray(entry.author) ? entry.author.map(a => a.name).join(', ') : entry.author?.name || 'Unknown',
-        pdf_url: pdfLink ? pdfLink['@_href'] + '.pdf' : null
+        pdf_url: pdfLink ? (pdfLink['@_href'].endsWith('.pdf') ? pdfLink['@_href'] : `${pdfLink['@_href']}.pdf`) : null
       };
     });
 

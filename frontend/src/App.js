@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Chat from './Chat';
+import { requestJson } from './api';
 import { FileText, Loader2, Sparkles, Globe } from 'lucide-react';
 
 // 🌟 完整的四大平台配置
@@ -17,6 +18,8 @@ export default function App() {
   const [isReady, setIsReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [initialPapers, setInitialPapers] = useState([]);
+  const [sessionId, setSessionId] = useState(null);
+  const [initStatus, setInitStatus] = useState('');
 
   const BACKEND_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:5001' 
@@ -32,8 +35,9 @@ export default function App() {
     if (!searchQuery) return alert("請輸入搜尋關鍵字！");
 
     setLoading(true);
+    setInitStatus('正在抓取 arXiv 論文並建立索引，通常需要 20–60 秒…');
     try {
-      const res = await fetch(`${BACKEND_URL}/api/arxiv/init`, {
+      const data = await requestJson(`${BACKEND_URL}/api/arxiv/init`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -43,15 +47,13 @@ export default function App() {
           embedModel: provider.embedModel 
         })
       });
-      const data = await res.json();
-      if (res.ok) {
-        setInitialPapers(data.papers);
-        setIsReady(true);
-      } else {
-        alert(data.error || "初始化失敗");
-      }
+      if (!data.sessionId) throw new Error('後端未建立搜尋工作階段，請稍後再試');
+      setInitialPapers(data.papers);
+      setSessionId(data.sessionId);
+      setIsReady(true);
     } catch (err) {
-      alert("連線後端失敗，請確認伺服器是否啟動？");
+      setInitStatus(err.message || '初始化失敗');
+      alert(err.message || "連線後端失敗，請確認伺服器是否啟動？");
     } finally {
       setLoading(false);
     }
@@ -123,6 +125,9 @@ export default function App() {
                 </>
               ) : '開始學術探索'}
             </button>
+            {initStatus && (
+              <p className="text-center text-xs font-medium text-slate-500" role="status">{initStatus}</p>
+            )}
           </div>
         </div>
       </div>
@@ -136,8 +141,10 @@ export default function App() {
       providerConfig={provider} 
       backendUrl={BACKEND_URL} 
       initialPapers={initialPapers} 
+      sessionId={sessionId}
       onClear={() => {
         setInitialPapers([]);
+        setSessionId(null);
         setIsReady(false);
       }} 
     />

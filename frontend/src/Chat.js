@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Download, PlusCircle, Send, Loader2, RotateCcw } from 'lucide-react';
+import { requestJson } from './api';
 
-export default function Chat({ apiKey, searchQuery, providerConfig, backendUrl, onClear, initialPapers }) {
+export default function Chat({ apiKey, searchQuery, providerConfig, backendUrl, onClear, initialPapers, sessionId }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [papers, setPapers] = useState(initialPapers || []); // 初始存儲
@@ -31,24 +32,25 @@ export default function Chat({ apiKey, searchQuery, providerConfig, backendUrl, 
     link.href = url;
     link.download = `arXiv_${searchQuery}_${papers.length}篇.txt`;
     link.click();
+    URL.revokeObjectURL(url);
   };
 
   // 功能：追加搜尋新的 10 篇 [cite: 1]
   const fetchMore = async () => {
     setIsLoadingMore(true);
     try {
-      const res = await fetch(`${backendUrl}/api/arxiv/more`, {
+      const data = await requestJson(`${backendUrl}/api/arxiv/more`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           searchQuery, 
+          sessionId,
           apiKey, 
           providerId: providerConfig.id,
           embedModel: providerConfig.embedModel,
           start: papers.length // 從目前數量開始往後抓 [cite: 1]
         })
       });
-      const data = await res.json();
       if (data.addedPapers && data.addedPapers.length > 0) {
         const updatedPapers = [...papers, ...data.addedPapers];
         setPapers(updatedPapers);
@@ -60,7 +62,7 @@ export default function Chat({ apiKey, searchQuery, providerConfig, backendUrl, 
         }]);
       }
     } catch (err) {
-      alert("追加失敗，請檢查網路連線");
+      alert(err.message || "追加失敗，請檢查網路連線");
     } finally {
       setIsLoadingMore(false);
     }
@@ -75,11 +77,12 @@ export default function Chat({ apiKey, searchQuery, providerConfig, backendUrl, 
     setIsTyping(true);
 
     try {
-      const res = await fetch(`${backendUrl}/api/chat`, {
+      const data = await requestJson(`${backendUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           searchQuery, 
+          sessionId,
           apiKey, 
           query: input, 
           providerId: providerConfig.id, 
@@ -87,10 +90,13 @@ export default function Chat({ apiKey, searchQuery, providerConfig, backendUrl, 
           embedModel: providerConfig.embedModel 
         })
       });
-      const data = await res.json();
+      if (!data.answer || !data.answer.trim()) throw new Error('服務未回傳可顯示的回答');
       setMessages(prev => [...prev, { role: 'assistant', content: data.answer }]);
     } catch (err) {
-      alert("對話連線失敗");
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `⚠️ 無法取得回答：${err.message || '對話連線失敗'}`
+      }]);
     } finally {
       setIsTyping(false);
     }
@@ -163,7 +169,8 @@ export default function Chat({ apiKey, searchQuery, providerConfig, backendUrl, 
           />
           <button 
             onClick={handleSend} 
-            className="p-4 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 active:scale-95"
+            disabled={isTyping || !input.trim()}
+            className="p-4 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 disabled:bg-slate-300 transition-all shadow-xl shadow-blue-100 active:scale-95"
           >
             <Send size={24} />
           </button>
