@@ -23,7 +23,7 @@ const addUniquePapers = (database, papers) => {
   return papers.filter(paper => !existingIds.has(paper.id));
 };
 
-app.get('/health', (req, res) => res.set('X-App-Version', 'grounded-contract-2026-09-25').status(200).send('OK'));
+app.get('/health', (req, res) => res.set('X-App-Version', 'mixed-overview-2026-09-25').status(200).send('OK'));
 
 // 初始化接口
 app.post('/api/arxiv/init', async (req, res) => {
@@ -110,9 +110,11 @@ app.post('/api/chat', async (req, res) => {
 
     // 相似度只是排序，不代表摘要足以支持答案；由回答規則再檢查證據。
     const topChunks = scoredChunks.slice(0, 8);
-    const rawAnswer = await generateAnswer(query, buildEvidenceContext(topChunks), apiKey, providerId, chatModel);
     const paperOnly = /(?:只(?:根據|用|依據)|僅(?:根據|用|依據)).{0,12}(?:論文|摘要|文獻)|(?:根據|依照).{0,12}(?:這批|這些|目前).{0,8}(?:論文|摘要)|這篇論文/.test(query);
-    res.json(finalizeAnswer(rawAnswer, topChunks, !paperOnly));
+    const preferOverview = !paperOnly && query.length <= 30 && /[\u3400-\u9fff]/.test(query) &&
+      !/(哪篇|比較|依據|證據|引用|來源|論文|摘要|文獻)/.test(query);
+    const rawAnswer = await generateAnswer(query, buildEvidenceContext(topChunks), apiKey, providerId, chatModel, preferOverview);
+    res.json(finalizeAnswer(rawAnswer, topChunks, !paperOnly, preferOverview));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

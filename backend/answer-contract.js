@@ -16,10 +16,9 @@ const insufficient = () => ({
   sources: []
 });
 
-const finalizeAnswer = (raw, chunks, allowGeneral = true) => {
+const finalizeAnswer = (raw, chunks, allowGeneral = true, requireOverview = false) => {
   const result = parseModelJson(raw);
   if (!result || typeof result !== 'object') return insufficient();
-
   if (result.mode === 'general' && allowGeneral && validGeneralText(result.answer)) {
     return {
       grounding: 'general',
@@ -27,7 +26,12 @@ const finalizeAnswer = (raw, chunks, allowGeneral = true) => {
       sources: []
     };
   }
-  if (result.mode !== 'paper' || !Array.isArray(result.claims)) return insufficient();
+  if (!['paper', 'mixed'].includes(result.mode) || !Array.isArray(result.claims)) return insufficient();
+
+  const overview = result.mode === 'mixed' && allowGeneral && validGeneralText(result.overview)
+    ? result.overview.trim() : null;
+  if (result.mode === 'mixed' && allowGeneral && !overview) return insufficient();
+  if (requireOverview && !overview) return insufficient();
 
   const supported = result.claims.slice(0, 4).flatMap(claim => {
     if (!claim || !Number.isInteger(claim.source) || claim.source < 1 || claim.source > chunks.length ||
@@ -38,12 +42,18 @@ const finalizeAnswer = (raw, chunks, allowGeneral = true) => {
     if (claimedNumbers.some(number => !claim.quote.includes(number))) return [];
     return [{ text: claim.text.trim(), number: claim.source, paper: paper.metadata }];
   });
-  if (supported.length === 0) return insufficient();
+  if (supported.length === 0) {
+    return overview ? {
+      grounding: 'general',
+      answer: `一般說明（未經這批論文摘要驗證）\n${overview}`,
+      sources: []
+    } : insufficient();
+  }
 
   const cited = [...new Set(supported.map(claim => claim.number))];
   return {
-    grounding: 'paper',
-    answer: supported.map(claim => `${claim.text} [${claim.number}]`).join('\n\n'),
+    grounding: overview ? 'mixed' : 'paper',
+    answer: `${overview ? `一般說明（未經這批論文摘要驗證）\n${overview}\n\n這批論文中的例子\n` : ''}${supported.map(claim => `${claim.text} [${claim.number}]`).join('\n\n')}`,
     sources: cited.map(number => ({
       number,
       title: chunks[number - 1].metadata.title,

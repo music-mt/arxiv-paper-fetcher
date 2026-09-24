@@ -12,14 +12,16 @@ test('the same grounding contract applies to unrelated topics', async () => {
   };
   try {
     await generateAnswer('光合作用', '[1] An abstract', 'test-key', 'google', 'test-model');
-    await generateAnswer('排序演算法', '[1] Another abstract', 'test-key', 'google', 'test-model');
+    await generateAnswer('排序演算法', '[1] Another abstract', 'test-key', 'google', 'test-model', true);
     assert.equal(prompts.length, 2);
     for (const prompt of prompts) {
       assert.match(prompt, /"mode":"paper"/);
       assert.match(prompt, /"mode":"general"/);
+      assert.match(prompt, /"mode":"mixed"/);
       assert.match(prompt, /"mode":"insufficient"/);
       assert.doesNotMatch(prompt, /量子加密|量子糾纏|張量網路/);
     }
+    assert.match(prompts[1], /必須先給 overview/);
   } finally {
     providers.google.generateAnswer = original;
   }

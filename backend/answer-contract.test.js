@@ -39,6 +39,24 @@ test('general answers cannot forge external links or paper citations', () => {
   assert.equal(finalizeAnswer(JSON.stringify({ mode: 'general', answer: '一般說明' }), chunks, false).grounding, 'insufficient');
 });
 
+test('broad concepts can combine a separate overview with verified paper examples', () => {
+  const mixed = finalizeAnswer(JSON.stringify({ mode: 'mixed',
+    overview: '這是由多個相互依賴步驟組成的流程。',
+    claims: [{ text: '此論文在基準測試中報告較低誤差。', source: 1,
+      quote: 'report lower error on the benchmark' }]
+  }), chunks, true, true);
+  assert.equal(mixed.grounding, 'mixed');
+  assert.match(mixed.answer, /一般說明（未經這批論文摘要驗證）/);
+  assert.match(mixed.answer, /這批論文中的例子/);
+  assert.equal(mixed.sources.length, 1);
+
+  const paperOnly = finalizeAnswer(JSON.stringify({ mode: 'paper', claims: [{
+    text: '此論文在基準測試中報告較低誤差。', source: 1,
+    quote: 'report lower error on the benchmark'
+  }] }), chunks, true, true);
+  assert.equal(paperOnly.grounding, 'insufficient');
+});
+
 test('unstructured model output is not shown as a sourced answer', () => {
   assert.equal(finalizeAnswer('我保證這些論文證明了答案 [1]', chunks).grounding, 'insufficient');
 });
