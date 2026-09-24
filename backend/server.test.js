@@ -39,7 +39,14 @@ test('expired session can be restored from the same papers and queried again', a
       ...credentials, chatModel: 'test-model', sessionId: 'expired', query: '張量網路'
     });
     assert.equal(concept.status, 200);
-    assert.deepEqual(concept.data.sources, []);
+    assert.match(concept.data.answer, /不是任何 50 量子位元系統/);
+    assert.equal(concept.data.sourceLabel, '參考資料');
+    assert.equal(concept.data.sources.length, 1);
+
+    const encryption = await post('/api/chat', {
+      ...credentials, chatModel: 'test-model', sessionId: 'expired', query: '量子加密'
+    });
+    assert.match(encryption.data.answer, /不能保證實際設備絕對安全/);
 
     const papers = [{ id: '1234.5678', title: 'Tensor network example', content: 'A tensor network summary.', pdf_url: 'https://arxiv.org/pdf/1234.5678.pdf' }];
     const restored = await post('/api/arxiv/restore', {
