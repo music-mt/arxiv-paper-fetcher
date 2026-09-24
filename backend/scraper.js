@@ -2,18 +2,34 @@ const axios = require('axios');
 const { XMLParser } = require('fast-xml-parser');
 
 const parser = new XMLParser({ ignoreAttributes: false });
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+const fetchFeed = async (url) => {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await axios.get(url, {
+        timeout: 15_000,
+        headers: { 'User-Agent': 'arxiv-paper-fetcher/1.1 (academic RAG client)', Accept: 'application/atom+xml' }
+      });
+    } catch (error) {
+      const retryableStatus = [406, 429, 502, 503, 504].includes(error.response?.status);
+      const retryableNetworkError = ['ECONNRESET', 'ETIMEDOUT'].includes(error.code);
+      if (attempt === 2 || (!retryableStatus && !retryableNetworkError)) throw error;
+      await sleep(3_000 * (attempt + 1));
+    }
+  }
+};
 
 const arxivScraper = async (query = 'machine learning', maxResults = 10, start = 0) => {
   try {
     console.log(`🔍 正在搜尋 arXiv: ${query} (從第 ${start} 篇開始，抓取 ${maxResults} 篇)`);
     
     // 增加 start 參數，確保分頁功能正常
-    const arxivUrl = `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&sortBy=submittedDate&sortOrder=descending&start=${start}&max_results=${maxResults}`;
+    const phrase = query.replace(/[^A-Za-z0-9 .+-]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+    if (!phrase) throw new Error('搜尋關鍵字不能為空');
+    const arxivUrl = `https://export.arxiv.org/api/query?search_query=${encodeURIComponent(`all:"${phrase}"`)}&sortBy=submittedDate&sortOrder=descending&start=${start}&max_results=${maxResults}`;
     
-    const response = await axios.get(arxivUrl, {
-      timeout: 15_000,
-      headers: { 'User-Agent': 'arxiv-paper-fetcher/1.1 (academic RAG client)' }
-    });
+    const response = await fetchFeed(arxivUrl);
     const jsonObj = parser.parse(response.data);
     let entries = jsonObj.feed.entry || [];
     

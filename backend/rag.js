@@ -29,10 +29,16 @@ const translateSearchQuery = async (query, apiKey, providerId, chatModel) => {
   if (!/[\u3400-\u9fff]/.test(query)) return query;
   if (!AI_PROVIDERS[providerId]) throw new Error('不支援的 AI provider');
 
-  const prompt = `將以下學術搜尋關鍵字轉成適合 arXiv 的精準英文搜尋詞。只輸出英文搜尋詞，不要解釋、引號、前綴或換行。\n\n關鍵字：${query}`;
+  const prompt = `將以下學術搜尋關鍵字轉成適合 arXiv 的 2 至 6 個英文搜尋詞。只輸出英文搜尋詞，不要解釋、引號、前綴、標點或換行。\n\n關鍵字：${query}`;
   const translated = await AI_PROVIDERS[providerId].generateAnswer(prompt, apiKey, chatModel);
-  const result = translated.replace(/["'`\n]/g, ' ').trim().slice(0, 200);
-  if (!result || /[\u3400-\u9fff]/.test(result)) throw new Error('無法將中文關鍵字轉為英文 arXiv 查詢');
+  const firstLine = translated.split(/\r?\n/).find(line => line.trim()) || '';
+  const result = firstLine
+    .split(/[(（]/)[0]
+    .replace(/[^A-Za-z0-9 .+-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200);
+  if (!result || !/[A-Za-z]/.test(result)) throw new Error('無法將中文關鍵字轉為英文 arXiv 查詢');
   return result;
 };
 
