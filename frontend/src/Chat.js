@@ -1,13 +1,54 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Download, PlusCircle, Send, Loader2, RotateCcw } from 'lucide-react';
 import { requestJson } from './api';
 
-export default function Chat({ apiKey, searchQuery, providerConfig, backendUrl, onClear, initialPapers, sessionId }) {
+export default function Chat({ apiKey, searchQuery, providerConfig, backendUrl, onClear, initialPapers, sessionId, searchDetails }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [papers, setPapers] = useState(initialPapers || []); // 初始存儲
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState(sessionId);
+  const restorePromise = useRef(null);
+
+  useEffect(() => setActiveSessionId(sessionId), [sessionId]);
+
+  const restoreSession = async () => {
+    if (!restorePromise.current) {
+      restorePromise.current = requestJson(`${backendUrl}/api/arxiv/restore`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          searchQuery,
+          arxivQuery: searchDetails?.arxivQuery,
+          searchMode: searchDetails?.searchMode,
+          papers,
+          apiKey,
+          providerId: providerConfig.id,
+          embedModel: providerConfig.embedModel
+        })
+      }).then(data => {
+        setActiveSessionId(data.sessionId);
+        return data.sessionId;
+      }).finally(() => { restorePromise.current = null; });
+    }
+    return restorePromise.current;
+  };
+
+  const requestWithSession = async (path, body) => {
+    const send = currentSessionId => requestJson(`${backendUrl}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...body, sessionId: currentSessionId })
+    });
+    try {
+      return await send(activeSessionId);
+    } catch (error) {
+      if (error.status !== 410 && !error.message.includes('工作階段已過期')) throw error;
+      const newSessionId = await restoreSession();
+      return send(newSessionId);
+    }
+  };
 
   // 🌟 核心修正：當 App.js 的資料傳進來時，強制同步到本地狀態
   useEffect(() => {
@@ -39,17 +80,11 @@ export default function Chat({ apiKey, searchQuery, providerConfig, backendUrl, 
   const fetchMore = async () => {
     setIsLoadingMore(true);
     try {
-      const data = await requestJson(`${backendUrl}/api/arxiv/more`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          searchQuery, 
-          sessionId,
-          apiKey, 
-          providerId: providerConfig.id,
-          embedModel: providerConfig.embedModel,
-          start: papers.length // 從目前數量開始往後抓 [cite: 1]
-        })
+      const data = await requestWithSession('/api/arxiv/more', {
+        apiKey,
+        providerId: providerConfig.id,
+        embedModel: providerConfig.embedModel,
+        start: papers.length
       });
       if (data.addedPapers && data.addedPapers.length > 0) {
         const updatedPapers = [...papers, ...data.addedPapers];
@@ -77,18 +112,12 @@ export default function Chat({ apiKey, searchQuery, providerConfig, backendUrl, 
     setIsTyping(true);
 
     try {
-      const data = await requestJson(`${backendUrl}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          searchQuery, 
-          sessionId,
-          apiKey, 
-          query: input, 
-          providerId: providerConfig.id, 
-          chatModel: providerConfig.chatModel, 
-          embedModel: providerConfig.embedModel 
-        })
+      const data = await requestWithSession('/api/chat', {
+        apiKey,
+        query: input,
+        providerId: providerConfig.id,
+        chatModel: providerConfig.chatModel,
+        embedModel: providerConfig.embedModel
       });
       if (!data.answer || !data.answer.trim()) throw new Error('服務未回傳可顯示的回答');
       setMessages(prev => [...prev, { role: 'assistant', content: data.answer, sources: data.sources || [] }]);

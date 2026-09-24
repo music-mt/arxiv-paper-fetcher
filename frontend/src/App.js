@@ -19,6 +19,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [initialPapers, setInitialPapers] = useState([]);
   const [sessionId, setSessionId] = useState(null);
+  const [searchDetails, setSearchDetails] = useState(null);
   const [initStatus, setInitStatus] = useState('');
 
   const BACKEND_URL = window.location.hostname === 'localhost' 
@@ -52,6 +53,7 @@ export default function App() {
       if (!Array.isArray(data.papers) || data.papers.length === 0) throw new Error('沒有找到相關論文，請換個關鍵字再試');
       setInitialPapers(data.papers);
       setSessionId(data.sessionId);
+      setSearchDetails({ arxivQuery: data.arxivQuery, searchMode: data.searchMode || 'phrase' });
       setIsReady(true);
     } catch (err) {
       setInitStatus(err.message || '初始化失敗');
@@ -144,9 +146,11 @@ export default function App() {
       backendUrl={BACKEND_URL} 
       initialPapers={initialPapers} 
       sessionId={sessionId}
+      searchDetails={searchDetails}
       onClear={() => {
         setInitialPapers([]);
         setSessionId(null);
+        setSearchDetails(null);
         setIsReady(false);
       }} 
     />

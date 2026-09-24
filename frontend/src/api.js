@@ -17,7 +17,9 @@ export async function requestJson(url, options, timeoutMs = DEFAULT_TIMEOUT_MS) 
         : { error: (await response.text()).slice(0, 200) };
 
       if (!response.ok) {
-        throw new Error(payload.error || `伺服器回傳 ${response.status}`);
+        const error = new Error(payload.error || `伺服器回傳 ${response.status}`);
+        error.status = response.status;
+        throw error;
       }
       return payload;
     } catch (error) {
