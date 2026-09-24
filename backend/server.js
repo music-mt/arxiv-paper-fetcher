@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { randomUUID } = require('crypto');
 const { arxivScraper } = require('./scraper');
-const { getEmbedding, cosineSimilarity, generateAnswer, translateSearchQuery, embedPapers } = require('./rag');
+const { getEmbedding, cosineSimilarity, generateAnswer, translateSearchQuery, embedPapers, buildEvidenceContext, citedSources } = require('./rag');
 
 const app = express();
 app.use(cors());
@@ -74,8 +74,6 @@ app.post('/api/chat', async (req, res) => {
   try {
     const db = database.chunks;
     if (db.length === 0) return fail(res, '知識庫目前沒有論文，請重新搜尋');
-    const totalInDB = db.length; // 🌟 獲取目前資料庫總篇數 
-
     const queryVector = await getEmbedding(query, apiKey, providerId, embedModel);
     const scoredChunks = db.map(item => ({ 
       text: item.text, 
@@ -83,18 +81,10 @@ app.post('/api/chat', async (req, res) => {
       score: cosineSimilarity(queryVector, item.embedding) 
     })).sort((a, b) => b.score - a.score);
 
-    const topContext = scoredChunks.slice(0, 10).map(c => `[論文: ${c.metadata.title}]\n${c.text}`).join('\n\n');
-    
-    // 🌟 強化 Prompt：告知 AI 目前的文獻總數與背景 
-    const enhancedQuery = `使用者正在與你討論關於「${database.searchQuery}」的主題。
-    目前你的知識庫中已經累積了 ${totalInDB} 篇相關論文摘要。
-    以下是從中檢索出與問題最相關的 10 篇內容，請以此回答使用者。
-    如果使用者提到要搜尋更多，請提醒他們可以點擊右上角的「繼續搜尋」按鈕。
-    
-    使用者問題：${query}`;
-
-    const answer = await generateAnswer(enhancedQuery, topContext, apiKey, providerId, chatModel);
-    res.json({ answer });
+    // 相似度只是排序，不代表摘要足以支持答案；由回答規則再檢查證據。
+    const topChunks = scoredChunks.slice(0, 8);
+    const answer = await generateAnswer(query, buildEvidenceContext(topChunks), apiKey, providerId, chatModel);
+    res.json({ answer, sources: citedSources(answer, topChunks) });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

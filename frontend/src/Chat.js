@@ -91,7 +91,7 @@ export default function Chat({ apiKey, searchQuery, providerConfig, backendUrl, 
         })
       });
       if (!data.answer || !data.answer.trim()) throw new Error('服務未回傳可顯示的回答');
-      setMessages(prev => [...prev, { role: 'assistant', content: data.answer }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: data.answer, sources: data.sources || [] }]);
     } catch (err) {
       setMessages(prev => [...prev, {
         role: 'assistant',
@@ -147,6 +147,18 @@ export default function Chat({ apiKey, searchQuery, providerConfig, backendUrl, 
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[85%] p-5 rounded-2xl shadow-sm leading-relaxed ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none'}`}>
               <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
+              {msg.sources?.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-slate-200 text-xs">
+                  <p className="font-bold mb-2">引用論文</p>
+                  {msg.sources.map(source => source.url ? (
+                    <a key={source.number} href={source.url} target="_blank" rel="noopener noreferrer" className="block text-blue-600 hover:underline mb-1">
+                      [{source.number}] {source.title}
+                    </a>
+                  ) : (
+                    <p key={source.number} className="mb-1">[{source.number}] {source.title}</p>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}
