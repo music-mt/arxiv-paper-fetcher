@@ -23,7 +23,7 @@ const addUniquePapers = (database, papers) => {
   return papers.filter(paper => !existingIds.has(paper.id));
 };
 
-app.get('/health', (req, res) => res.set('X-App-Version', 'mixed-overview-2026-09-25').status(200).send('OK'));
+app.get('/health', (req, res) => res.set('X-App-Version', 'question-intent-2026-09-25').status(200).send('OK'));
 
 // 初始化接口
 app.post('/api/arxiv/init', async (req, res) => {
