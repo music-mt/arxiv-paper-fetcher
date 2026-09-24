@@ -44,7 +44,8 @@ export default function App() {
           searchQuery, 
           apiKey, 
           providerId: provider.id, 
-          embedModel: provider.embedModel 
+          embedModel: provider.embedModel,
+          chatModel: provider.chatModel
         })
       });
       if (!data.sessionId) throw new Error('後端未建立搜尋工作階段，請稍後再試');
