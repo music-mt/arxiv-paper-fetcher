@@ -49,6 +49,7 @@ export default function App() {
         })
       });
       if (!data.sessionId) throw new Error('後端未建立搜尋工作階段，請稍後再試');
+      if (!Array.isArray(data.papers) || data.papers.length === 0) throw new Error('沒有找到相關論文，請換個關鍵字再試');
       setInitialPapers(data.papers);
       setSessionId(data.sessionId);
       setIsReady(true);

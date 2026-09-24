@@ -20,14 +20,17 @@ const fetchFeed = async (url) => {
   }
 };
 
-const arxivScraper = async (query = 'machine learning', maxResults = 10, start = 0) => {
+const arxivScraper = async (query = 'machine learning', maxResults = 10, start = 0, mode = 'phrase') => {
   try {
     console.log(`🔍 正在搜尋 arXiv: ${query} (從第 ${start} 篇開始，抓取 ${maxResults} 篇)`);
     
     // 增加 start 參數，確保分頁功能正常
     const phrase = query.replace(/[^A-Za-z0-9 .+-]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
     if (!phrase) throw new Error('搜尋關鍵字不能為空');
-    const arxivUrl = `https://export.arxiv.org/api/query?search_query=${encodeURIComponent(`all:"${phrase}"`)}&sortBy=submittedDate&sortOrder=descending&start=${start}&max_results=${maxResults}`;
+    const expression = mode === 'terms'
+      ? phrase.split(' ').slice(0, 6).map(term => `all:${term}`).join(' AND ')
+      : `all:"${phrase}"`;
+    const arxivUrl = `https://export.arxiv.org/api/query?search_query=${encodeURIComponent(expression)}&sortBy=submittedDate&sortOrder=descending&start=${start}&max_results=${maxResults}`;
     
     const response = await fetchFeed(arxivUrl);
     const jsonObj = parser.parse(response.data);

@@ -30,11 +30,17 @@ app.post('/api/arxiv/init', async (req, res) => {
   if (!requireFields(req.body, ['searchQuery', 'apiKey', 'providerId', 'embedModel', 'chatModel'])) return fail(res, '缺少必要的初始化欄位');
   try {
     const arxivQuery = await translateSearchQuery(searchQuery, apiKey, providerId, chatModel);
-    const papers = await arxivScraper(arxivQuery, 20, 0);
+    let searchMode = 'phrase';
+    let papers = await arxivScraper(arxivQuery, 20, 0, searchMode);
+    if (papers.length === 0 && arxivQuery.includes(' ')) {
+      searchMode = 'terms';
+      papers = await arxivScraper(arxivQuery, 20, 0, searchMode);
+    }
+    if (papers.length === 0) return fail(res, `找不到「${arxivQuery}」相關論文，請換個關鍵字再試`, 404);
     const chunks = await embedPapers(papers, apiKey, providerId, embedModel);
     const sessionId = randomUUID();
-    vectorDatabases.set(sessionId, { searchQuery, arxivQuery, chunks, createdAt: Date.now() });
-    res.json({ message: '初始化成功', sessionId, papers });
+    vectorDatabases.set(sessionId, { searchQuery, arxivQuery, searchMode, chunks, createdAt: Date.now() });
+    res.json({ message: '初始化成功', sessionId, papers, arxivQuery });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -48,7 +54,7 @@ app.post('/api/arxiv/more', async (req, res) => {
   const database = vectorDatabases.get(sessionId);
   if (!database) return fail(res, '工作階段已過期，請重新初始化');
   try {
-    const fetchedPapers = await arxivScraper(database.arxivQuery, 10, start);
+    const fetchedPapers = await arxivScraper(database.arxivQuery, 10, start, database.searchMode);
     const newPapers = addUniquePapers(database, fetchedPapers);
     const chunks = await embedPapers(newPapers, apiKey, providerId, embedModel);
     database.chunks.push(...chunks);
@@ -67,6 +73,7 @@ app.post('/api/chat', async (req, res) => {
   if (!database) return fail(res, '工作階段已過期，請重新初始化');
   try {
     const db = database.chunks;
+    if (db.length === 0) return fail(res, '知識庫目前沒有論文，請重新搜尋');
     const totalInDB = db.length; // 🌟 獲取目前資料庫總篇數 
 
     const queryVector = await getEmbedding(query, apiKey, providerId, embedModel);

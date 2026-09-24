@@ -1,5 +1,22 @@
 const AI_PROVIDERS = require('./providers');
 
+const COMMON_SEARCH_TERMS = new Map([
+  ['機器學習', 'machine learning'],
+  ['机器学习', 'machine learning'],
+  ['深度學習', 'deep learning'],
+  ['深度学习', 'deep learning'],
+  ['大語言模型', 'large language model'],
+  ['大语言模型', 'large language model'],
+  ['人工智慧', 'artificial intelligence'],
+  ['人工智能', 'artificial intelligence'],
+  ['強化學習', 'reinforcement learning'],
+  ['强化学习', 'reinforcement learning'],
+  ['反向傳播', 'backpropagation'],
+  ['反向传播', 'backpropagation'],
+  ['演算法', 'algorithm'],
+  ['算法', 'algorithm']
+]);
+
 const cosineSimilarity = (vecA, vecB) => {
   if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length === 0 || vecA.length !== vecB.length) {
     return Number.NEGATIVE_INFINITY;
@@ -27,6 +44,8 @@ const generateAnswer = async (query, context, apiKey, providerId, chatModel) => 
 
 const translateSearchQuery = async (query, apiKey, providerId, chatModel) => {
   if (!/[\u3400-\u9fff]/.test(query)) return query;
+  const knownTerm = COMMON_SEARCH_TERMS.get(query.replace(/\s+/g, '').trim());
+  if (knownTerm) return knownTerm;
   if (!AI_PROVIDERS[providerId]) throw new Error('不支援的 AI provider');
 
   const prompt = `將以下學術搜尋關鍵字轉成適合 arXiv 的 2 至 6 個英文搜尋詞。只輸出英文搜尋詞，不要解釋、引號、前綴、標點或換行。\n\n關鍵字：${query}`;
