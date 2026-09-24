@@ -5,7 +5,7 @@ import { FileText, Loader2, Sparkles, Globe } from 'lucide-react';
 
 // 🌟 完整的四大平台配置
 const PROVIDER_OPTIONS = [
-  { id: 'google', name: 'Google AI (Gemini)', embedModel: 'gemini-embedding-001', chatModel: 'gemini-3.8-flash' },
+  { id: 'google', name: 'Google AI (Gemini)', embedModel: 'gemini-embedding-001', chatModel: 'gemini-3.5-flash-lite' },
   { id: 'openai', name: 'Open AI (ChatGPT)', embedModel: 'text-embedding-3-small', chatModel: 'gpt-4o-mini' },
   { id: 'xai', name: 'xAI (Grok)', embedModel: 'v1', chatModel: 'grok-beta' },
   { id: 'anthropic', name: 'Anthropic (Claude)', embedModel: '', chatModel: 'claude-3-haiku-20240307' }

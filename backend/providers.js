@@ -11,6 +11,21 @@ const request = async (...args) => {
   }
 };
 
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const retryTransientRequest = async (operation) => {
+  let lastError;
+  for (const delay of [0, 750, 1_500]) {
+    if (delay) await sleep(delay);
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!/high demand|temporar|rate limit|\b429\b/i.test(error.message)) throw error;
+    }
+  }
+  throw lastError;
+};
+
 const requireText = (text, provider) => {
   if (typeof text !== 'string' || !text.trim()) {
     throw new Error(`${provider} 未回傳可顯示的文字；請檢查模型存取權限、內容安全設定或用量配額`);
@@ -27,7 +42,11 @@ const AI_PROVIDERS = {
     },
     generateAnswer: async (prompt, apiKey, modelName) => {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-      const res = await request(url, { contents: [{ parts: [{ text: prompt }] }] }, { headers: { 'Content-Type': 'application/json' }});
+      const res = await retryTransientRequest(() => request(
+        url,
+        { contents: [{ parts: [{ text: prompt }] }] },
+        { headers: { 'Content-Type': 'application/json' }}
+      ));
       const text = res.data.candidates?.[0]?.content?.parts
         ?.map(part => part.text || '')
         .join('');
